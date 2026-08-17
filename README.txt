@@ -1,27 +1,31 @@
-WEINKELLER SCANNER – PWA VERSION 2
+WEINKELLER SCANNER V3
 
-Diese Version ist für HTTPS-Hosting gedacht und kann dann die Kamera auf Android verwenden.
+Neu in V3:
+- Barcode-Scanner wie bisher
+- Etikett mit Handykamera fotografieren
+- lokale OCR im Browser mit Tesseract.js
+- automatische Vorschläge für:
+  Weingut, Weinname, Jahrgang, Rebsorte, Region, Land, Weinart,
+  Alkoholgehalt und Flaschengröße
+- keine kostenpflichtige API
+- keine InVintory-Anbindung
+- keine API-Schlüssel
 
-Dateien:
-- index.html
-- app.js
-- manifest.webmanifest
-- sw.js
+WICHTIG:
+Die Bildanalyse erfolgt lokal im Browser. Tesseract.js und die Sprachmodelle
+werden beim ersten Einsatz aus dem Internet geladen und danach üblicherweise
+vom Browser zwischengespeichert. Dafür entstehen keine nutzungsabhängigen Kosten.
 
-Wichtig:
-Die Kamera funktioniert in mobilen Browsern zuverlässig nur über HTTPS oder localhost.
-Eine lokal geöffnete Datei (file://...) reicht nicht.
+Die Erkennung ist absichtlich als Vorschlagssystem gebaut:
+Bei dekorativen, gebogenen oder schlecht beleuchteten Etiketten kann OCR Fehler
+machen. Vor „Einlagern“ sollten die erkannten Felder kurz geprüft werden.
 
-Empfohlen:
-1. Dateien in ein GitHub-Repository hochladen.
-2. GitHub Pages aktivieren.
-3. Die dadurch erzeugte HTTPS-Adresse auf dem Android-Handy in Chrome öffnen.
-4. Kamerazugriff erlauben.
-5. Optional über Chrome „Zum Startbildschirm hinzufügen“ / App installieren.
+GitHub:
+Ersetze in deinem bestehenden Repository die bisherigen Dateien durch:
+index.html
+app.js
+manifest.webmanifest
+sw.js
+README.txt
 
-Die App speichert Kellerdaten zunächst lokal im Browser (localStorage).
-CSV-Export für Excel ist eingebaut.
-
-Hinweis:
-EAN/UPC identifiziert einen Wein nicht zwingend jahrgangsscharf.
-Darum bleibt der Jahrgang separat und muss geprüft werden.
+Die bestehende GitHub-Pages-Adresse kann unverändert bleiben.

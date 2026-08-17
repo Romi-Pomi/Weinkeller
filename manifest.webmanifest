@@ -1,9 +1,9 @@
 {
-  "name": "Weinkeller Scanner",
+  "name": "Weinkeller Scanner V3",
   "short_name": "Weinkeller",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#f4f1ed",
   "theme_color": "#6b1f2b",
-  "description": "Barcode-Scanner und Bestandsverwaltung für den privaten Weinkeller."
+  "description": "Kostenloser Barcode- und Etikettenscanner für den privaten Weinkeller."
 }
