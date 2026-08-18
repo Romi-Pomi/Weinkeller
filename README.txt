@@ -1,31 +1,16 @@
-WEINKELLER SCANNER V3
+WEINKELLER SCANNER V4
 
-Neu in V3:
-- Barcode-Scanner wie bisher
-- Etikett mit Handykamera fotografieren
-- lokale OCR im Browser mit Tesseract.js
-- automatische Vorschläge für:
-  Weingut, Weinname, Jahrgang, Rebsorte, Region, Land, Weinart,
-  Alkoholgehalt und Flaschengröße
+Änderungen gegenüber V3:
+- Feld "Lage / Appellation" statt separatem Wein-/Appellationsfeld
+- neues Feld "Prädikat"
+- vorsichtigere OCR-Auswertung: unsichere Werte bleiben eher leer
+- automatische Erkennung von Jahrgang, Rebsorte, Region/Land, Prädikat, Alkohol und Flaschengröße
+- Weinart wird aus Etikett/Rebsorte abgeleitet
+- lokales Archiv im Browser
+- CSV-Export
 - keine kostenpflichtige API
-- keine InVintory-Anbindung
-- keine API-Schlüssel
 
-WICHTIG:
-Die Bildanalyse erfolgt lokal im Browser. Tesseract.js und die Sprachmodelle
-werden beim ersten Einsatz aus dem Internet geladen und danach üblicherweise
-vom Browser zwischengespeichert. Dafür entstehen keine nutzungsabhängigen Kosten.
-
-Die Erkennung ist absichtlich als Vorschlagssystem gebaut:
-Bei dekorativen, gebogenen oder schlecht beleuchteten Etiketten kann OCR Fehler
-machen. Vor „Einlagern“ sollten die erkannten Felder kurz geprüft werden.
-
-GitHub:
-Ersetze in deinem bestehenden Repository die bisherigen Dateien durch:
-index.html
-app.js
-manifest.webmanifest
-sw.js
-README.txt
-
-Die bestehende GitHub-Pages-Adresse kann unverändert bleiben.
+GitHub Pages:
+Alle Dateien ins Stammverzeichnis (root) des main-Branches legen.
+Nach dem Ersetzen kann GitHub Pages 1–3 Minuten zum Aktualisieren brauchen.
+Falls die alte Version angezeigt wird: Seite neu laden oder Browser-Cache leeren.
