@@ -1,10 +1,1 @@
-{
-  "name": "Weinkeller Scanner V4",
-  "short_name": "Weinkeller V4",
-  "start_url": "./",
-  "scope": "./",
-  "display": "standalone",
-  "background_color": "#f6f1ee",
-  "theme_color": "#7b1d2d",
-  "icons": []
-}
+{"name":"Weinkeller Scanner V5","short_name":"Weinkeller V5","start_url":"./","display":"standalone","theme_color":"#7b1d2d","background_color":"#f6f1ee"}
