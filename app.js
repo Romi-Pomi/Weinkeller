@@ -135,14 +135,56 @@ function parse(text){
   return out;
 }
 
-function setImage(file,side){
-  if(!file)return;
-  if(side==="front"){frontImage=file;$("frontPreview").src=URL.createObjectURL(file);$("frontPreview").style.display="block"}
-  else{backImage=file;$("backPreview").src=URL.createObjectURL(file);$("backPreview").style.display="block"}
-  $("analyzeBtn").disabled=!(frontImage||backImage);
+async function fileToDataURL(file){
+  return await new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(reader.result);
+    reader.onerror=()=>reject(reader.error);
+    reader.readAsDataURL(file);
+  });
 }
-$("frontInput").onchange=e=>setImage(e.target.files[0],"front");
-$("backInput").onchange=e=>setImage(e.target.files[0],"back");
+
+async function setImage(file,side){
+  if(!file)return;
+
+  try{
+    if(side==="front") frontImage=file;
+    else backImage=file;
+
+    const dataUrl=await fileToDataURL(file);
+
+    if(side==="front"){
+      $("frontPreview").src=dataUrl;
+      $("frontPreview").style.display="block";
+    }else{
+      $("backPreview").src=dataUrl;
+      $("backPreview").style.display="block";
+    }
+
+    $("analyzeBtn").disabled=!(frontImage||backImage);
+
+    if(frontImage&&backImage){
+      $("status").textContent="✅ Vorder- und Rückseite übernommen. Bereit zur Analyse.";
+    }else if(frontImage){
+      $("status").textContent="✅ Vorderseite übernommen. Du kannst jetzt analysieren oder noch die Rückseite fotografieren.";
+    }else{
+      $("status").textContent="✅ Rückseite übernommen. Du kannst noch die Vorderseite fotografieren.";
+    }
+  }catch(err){
+    console.error("Foto konnte nicht übernommen werden:",err);
+    $("status").textContent="❌ Das Foto konnte nicht übernommen werden. Bitte erneut fotografieren.";
+  }
+}
+
+$("frontInput").addEventListener("change",async e=>{
+  const file=e.target.files?.[0];
+  if(file)await setImage(file,"front");
+});
+
+$("backInput").addEventListener("change",async e=>{
+  const file=e.target.files?.[0];
+  if(file)await setImage(file,"back");
+});
 
 $("analyzeBtn").onclick=async()=>{
   if(!(frontImage||backImage))return;
@@ -168,23 +210,33 @@ $("analyzeBtn").onclick=async()=>{
 
 const ids=["ean","winery","vintage","type","grapes","country","region","appellation","predicate","alcohol","size","qty","price","shelf","slot","notes"];
 function formData(){let o={};ids.forEach(i=>o[i]=$(i).value);return o}
-function all(){try{return JSON.parse(localStorage.winesV51||"[]")}catch{return[]}}
+function all(){try{return JSON.parse(localStorage.winesV52||localStorage.winesV51||"[]")}catch{return[]}}
+function saveAll(a){localStorage.winesV52=JSON.stringify(a)}
 function render(){
   const a=all();
   $("archive").innerHTML=a.map(w=>`<div class="archive-item"><b>${w.winery||""} ${w.vintage||""}</b><br>${w.appellation||""} · ${w.grapes||""} · ${w.predicate||""}<div class="muted">${w.region||""} ${w.alcohol?("· "+w.alcohol+" %"):""}</div></div>`).join("")||"Noch keine Weine gespeichert.";
 }
-$("saveBtn").onclick=()=>{let a=all();a.unshift(formData());localStorage.winesV51=JSON.stringify(a);render();$("status").textContent="Wein gespeichert."};
+$("saveBtn").onclick=()=>{let a=all();a.unshift(formData());saveAll(a);render();$("status").textContent="Wein gespeichert."};
 $("clearBtn").onclick=()=>{
   ids.forEach(i=>$(i).value="");$("size").value="0,75";$("qty").value="1";
-  frontImage=backImage=null;$("frontPreview").style.display="none";$("backPreview").style.display="none";
-  $("frontInput").value="";$("backInput").value="";$("ocrText").textContent="";$("analyzeBtn").disabled=true;$("bar").style.width="0";
+  frontImage=backImage=null;$("frontPreview").removeAttribute("src");$("backPreview").removeAttribute("src");
+  $("frontPreview").style.display="none";$("backPreview").style.display="none";
+  $("frontInput").value="";$("backInput").value="";$("ocrText").textContent="";
+  $("analyzeBtn").disabled=true;$("bar").style.width="0";
+  $("status").textContent="Du kannst nur die Vorderseite oder Vorder- und Rückseite fotografieren.";
 };
 $("csvBtn").onclick=()=>{
   const a=all(); if(!a.length)return;
   const q=v=>`"${String(v||"").replace(/"/g,'""')}"`;
   const csv="\uFEFF"+ids.join(";")+"\n"+a.map(w=>ids.map(i=>q(w[i])).join(";")).join("\n");
   const u=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"})),l=document.createElement("a");
-  l.href=u;l.download="weinkeller-v5-1.csv";l.click();setTimeout(()=>URL.revokeObjectURL(u),1000);
+  l.href=u;l.download="weinkeller-v5-2.csv";l.click();setTimeout(()=>URL.revokeObjectURL(u),1000);
 };
-if("serviceWorker"in navigator)navigator.serviceWorker.register("./sw.js");
+
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.getRegistrations().then(registrations=>{
+    registrations.forEach(registration=>registration.unregister());
+  });
+}
+
 render();
