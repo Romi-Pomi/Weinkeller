@@ -6,6 +6,7 @@ const REGIONS=[["Mosel","Deutschland"],["Rheingau","Deutschland"],["Pfalz","Deut
 const PREDS=["Kabinett","Spätlese","Auslese","Beerenauslese","Trockenbeerenauslese","Eiswein","Großes Gewächs","Grosses Gewächs"];
 const WINERIES=["Markus Molitor","Dr. Loosen","Joh. Jos. Prüm","Egon Müller","Dönnhoff","Robert Weil","Keller","Wittmann","Fritz Haag","Schloss Lieser","Clemens Busch","Van Volxem"];
 
+function debug(msg){ $("debug").textContent += "\n" + msg; }
 const norm=s=>String(s||"").toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu,"").replace(/[^a-z0-9]+/g," ").trim();
 
 function lev(a,b){
@@ -38,30 +39,78 @@ function extractVintage(text){
     const y=repairVintageToken(c);
     if(y)return y;
   }
-
-  const lines=text.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
-  for(const line of lines){
-    const compact=line.replace(/[^0-9OQILSB|]/gi,"");
-    if(compact.length>=4&&compact.length<=6){
-      const y=repairVintageToken(compact);
-      if(y)return y;
-    }
-  }
   return "";
 }
 
-async function makeBitmap(file){return await createImageBitmap(file)}
+async function fileToDataURL(file){
+  return await new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(reader.result);
+    reader.onerror=()=>reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+function updatePhotoStatus(){
+  if(frontImage&&backImage) $("status").textContent="✅ Vorder- und Rückseite übernommen. Bereit zur Analyse.";
+  else if(frontImage) $("status").textContent="✅ Vorderseite übernommen. Rückseite ist optional.";
+  else if(backImage) $("status").textContent="✅ Rückseite übernommen. Vorderseite ist optional.";
+  else $("status").textContent="Noch kein Foto übernommen.";
+  $("analyzeBtn").disabled=!(frontImage||backImage);
+}
+
+async function loadPhoto(input,side){
+  try{
+    const file=input.files?.[0];
+    debug(side+": change ausgelöst");
+    if(!file){ debug(side+": keine Datei erhalten"); return; }
+
+    debug(side+": "+file.name+" | "+file.type+" | "+file.size+" Bytes");
+
+    if(side==="front") frontImage=file;
+    else backImage=file;
+
+    const dataUrl=await fileToDataURL(file);
+    const preview=side==="front"?$("frontPreview"):$("backPreview");
+    const ok=side==="front"?$("frontOk"):$("backOk");
+
+    preview.src=dataUrl;
+    preview.style.display="block";
+    ok.style.display="block";
+    updatePhotoStatus();
+    debug(side+": Vorschau erfolgreich geladen");
+  }catch(e){
+    console.error(e);
+    debug(side+": FEHLER "+(e?.message||String(e)));
+    $("status").textContent="❌ Foto konnte nicht übernommen werden.";
+  }
+}
+
+$("frontInput").addEventListener("change",function(){loadPhoto(this,"front")});
+$("backInput").addEventListener("change",function(){loadPhoto(this,"back")});
+
+async function makeBitmap(file){
+  if("createImageBitmap" in window) return await createImageBitmap(file);
+  return await new Promise((resolve,reject)=>{
+    const img=new Image();
+    const u=URL.createObjectURL(file);
+    img.onload=()=>{URL.revokeObjectURL(u);resolve(img)};
+    img.onerror=e=>{URL.revokeObjectURL(u);reject(e)};
+    img.src=u;
+  });
+}
+
 function preprocess(bitmap,mode){
-  const scale=Math.min(2.2,1800/bitmap.width);
-  const w=Math.max(900,Math.round(bitmap.width*scale)),h=Math.round(bitmap.height*scale);
-  const c=document.createElement("canvas");c.width=w;c.height=h;
+  const scale=Math.min(2.0,1600/bitmap.width);
+  const w=Math.max(800,Math.round(bitmap.width*scale));
+  const h=Math.round(bitmap.height*scale);
+  const c=document.createElement("canvas"); c.width=w; c.height=h;
   const ctx=c.getContext("2d",{willReadFrequently:true});
   ctx.drawImage(bitmap,0,0,w,h);
   const im=ctx.getImageData(0,0,w,h),d=im.data;
   for(let i=0;i<d.length;i+=4){
     let g=.299*d[i]+.587*d[i+1]+.114*d[i+2];
-    if(mode===1)g=(g-128)*1.6+128;
-    if(mode===2)g=g>155?255:0;
+    if(mode===1)g=(g-128)*1.55+128;
     g=Math.max(0,Math.min(255,g));
     d[i]=d[i+1]=d[i+2]=g;
   }
@@ -72,11 +121,11 @@ function preprocess(bitmap,mode){
 async function ocrOne(file,label,start,span){
   const bm=await makeBitmap(file);
   const texts=[];
-  for(let mode=0;mode<3;mode++){
+  for(let mode=0;mode<2;mode++){
     const src=preprocess(bm,mode);
     const r=await Tesseract.recognize(src,"deu+eng",{logger:m=>{
       if(m.status==="recognizing text"&&typeof m.progress==="number"){
-        $("bar").style.width=(start+(mode/3)*span+(m.progress*span/3))+"%";
+        $("bar").style.width=(start+(mode/2)*span+(m.progress*span/2))+"%";
       }
     }});
     texts.push(`--- ${label} OCR ${mode+1} ---\n${r.data.text||""}`);
@@ -89,7 +138,6 @@ function parse(text){
   const out={};
 
   out.vintage=extractVintage(text);
-
   out.grapes=GRAPES.find(g=>contains(text,g)||lines.some(l=>lev(l,g)>.65))||"";
 
   for(const [r,c] of REGIONS){
@@ -110,10 +158,8 @@ function parse(text){
   if((contains(text,"erdener")||lines.some(l=>lev(l,"Erdener")>.50)) &&
      (contains(text,"treppchen")||lines.some(l=>lev(l,"Treppchen")>.45))){
     out.appellation="Erdener Treppchen";
-  } else {
+  }else{
     out.appellation="";
-    const pi=lines.findIndex(l=>PREDS.some(p=>contains(l,p)||lev(l,p)>.60));
-    if(pi>0&&!/\d{4}/.test(lines[pi-1]))out.appellation=lines[pi-1];
   }
 
   const whites=["Riesling","Chardonnay","Sauvignon Blanc","Grauburgunder","Weißburgunder","Pinot Blanc","Pinot Gris","Gewürztraminer","Silvaner","Müller-Thurgau","Grüner Veltliner"];
@@ -129,114 +175,105 @@ function parse(text){
   else if(!sz&&/\b375\s*ml\b/i.test(text))out.size="0,375";
   else if(sz)out.size=sz[1].replace(".",",");
 
-  const ean=(text.match(/\b\d{8,14}\b/g)||[]).find(x=>![12]\d{3}/.test(x));
+  const ean=(text.match(/\b\d{8,14}\b/g)||[]).find(x=>x.length>=8);
   out.ean=ean||"";
 
   return out;
 }
 
-async function fileToDataURL(file){
-  return await new Promise((resolve,reject)=>{
-    const reader=new FileReader();
-    reader.onload=()=>resolve(reader.result);
-    reader.onerror=()=>reject(reader.error);
-    reader.readAsDataURL(file);
-  });
-}
-
-async function setImage(file,side){
-  if(!file)return;
-
-  try{
-    if(side==="front") frontImage=file;
-    else backImage=file;
-
-    const dataUrl=await fileToDataURL(file);
-
-    if(side==="front"){
-      $("frontPreview").src=dataUrl;
-      $("frontPreview").style.display="block";
-    }else{
-      $("backPreview").src=dataUrl;
-      $("backPreview").style.display="block";
-    }
-
-    $("analyzeBtn").disabled=!(frontImage||backImage);
-
-    if(frontImage&&backImage){
-      $("status").textContent="✅ Vorder- und Rückseite übernommen. Bereit zur Analyse.";
-    }else if(frontImage){
-      $("status").textContent="✅ Vorderseite übernommen. Du kannst jetzt analysieren oder noch die Rückseite fotografieren.";
-    }else{
-      $("status").textContent="✅ Rückseite übernommen. Du kannst noch die Vorderseite fotografieren.";
-    }
-  }catch(err){
-    console.error("Foto konnte nicht übernommen werden:",err);
-    $("status").textContent="❌ Das Foto konnte nicht übernommen werden. Bitte erneut fotografieren.";
-  }
-}
-
-$("frontInput").addEventListener("change",async e=>{
-  const file=e.target.files?.[0];
-  if(file)await setImage(file,"front");
-});
-
-$("backInput").addEventListener("change",async e=>{
-  const file=e.target.files?.[0];
-  if(file)await setImage(file,"back");
-});
-
 $("analyzeBtn").onclick=async()=>{
   if(!(frontImage||backImage))return;
-  $("analyzeBtn").disabled=true;$("bar").style.width="1%";
-  $("status").textContent="Vorder- und Rückseite werden zusammen ausgewertet …";
+  $("analyzeBtn").disabled=true;
+  $("bar").style.width="1%";
+  $("status").textContent="Analyse läuft …";
   try{
     let texts=[];
     if(frontImage)texts.push(...await ocrOne(frontImage,"VORDERSEITE",0,frontImage&&backImage?50:100));
     if(backImage)texts.push(...await ocrOne(backImage,"RÜCKSEITE",frontImage?50:0,frontImage?50:100));
+
     const merged=texts.join("\n\n");
     $("ocrText").textContent=merged;
     const o=parse(merged);
+
     for(const k of ["ean","winery","vintage","type","grapes","country","region","appellation","predicate","alcohol","size"]){
       if(o[k])$(k).value=o[k];
     }
-    $("status").textContent="Analyse abgeschlossen. Vorder- und Rückseite wurden gemeinsam berücksichtigt.";
+
     $("bar").style.width="100%";
+    $("status").textContent="✅ Analyse abgeschlossen.";
   }catch(e){
     console.error(e);
-    $("status").textContent="Erkennung fehlgeschlagen. Bitte Foto erneut aufnehmen.";
-  }finally{$("analyzeBtn").disabled=false}
+    debug("OCR FEHLER: "+(e?.message||String(e)));
+    $("status").textContent="❌ Analyse fehlgeschlagen. Technische Diagnose öffnen.";
+  }finally{
+    $("analyzeBtn").disabled=!(frontImage||backImage);
+  }
 };
 
 const ids=["ean","winery","vintage","type","grapes","country","region","appellation","predicate","alcohol","size","qty","price","shelf","slot","notes"];
 function formData(){let o={};ids.forEach(i=>o[i]=$(i).value);return o}
-function all(){try{return JSON.parse(localStorage.winesV52||localStorage.winesV51||"[]")}catch{return[]}}
-function saveAll(a){localStorage.winesV52=JSON.stringify(a)}
+function all(){
+  try{return JSON.parse(localStorage.winesV53||localStorage.winesV52||localStorage.winesV51||"[]")}
+  catch{return[]}
+}
 function render(){
   const a=all();
   $("archive").innerHTML=a.map(w=>`<div class="archive-item"><b>${w.winery||""} ${w.vintage||""}</b><br>${w.appellation||""} · ${w.grapes||""} · ${w.predicate||""}<div class="muted">${w.region||""} ${w.alcohol?("· "+w.alcohol+" %"):""}</div></div>`).join("")||"Noch keine Weine gespeichert.";
 }
-$("saveBtn").onclick=()=>{let a=all();a.unshift(formData());saveAll(a);render();$("status").textContent="Wein gespeichert."};
-$("clearBtn").onclick=()=>{
-  ids.forEach(i=>$(i).value="");$("size").value="0,75";$("qty").value="1";
-  frontImage=backImage=null;$("frontPreview").removeAttribute("src");$("backPreview").removeAttribute("src");
-  $("frontPreview").style.display="none";$("backPreview").style.display="none";
-  $("frontInput").value="";$("backInput").value="";$("ocrText").textContent="";
-  $("analyzeBtn").disabled=true;$("bar").style.width="0";
-  $("status").textContent="Du kannst nur die Vorderseite oder Vorder- und Rückseite fotografieren.";
-};
-$("csvBtn").onclick=()=>{
-  const a=all(); if(!a.length)return;
-  const q=v=>`"${String(v||"").replace(/"/g,'""')}"`;
-  const csv="\uFEFF"+ids.join(";")+"\n"+a.map(w=>ids.map(i=>q(w[i])).join(";")).join("\n");
-  const u=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"})),l=document.createElement("a");
-  l.href=u;l.download="weinkeller-v5-2.csv";l.click();setTimeout(()=>URL.revokeObjectURL(u),1000);
+
+$("saveBtn").onclick=()=>{
+  let a=all();
+  a.unshift(formData());
+  localStorage.winesV53=JSON.stringify(a);
+  render();
+  $("status").textContent="✅ Wein gespeichert.";
 };
 
-if("serviceWorker" in navigator){
-  navigator.serviceWorker.getRegistrations().then(registrations=>{
-    registrations.forEach(registration=>registration.unregister());
+$("clearBtn").onclick=()=>{
+  ids.forEach(i=>$(i).value="");
+  $("size").value="0,75";
+  $("qty").value="1";
+
+  frontImage=backImage=null;
+
+  ["frontPreview","backPreview"].forEach(i=>{
+    $(i).removeAttribute("src");
+    $(i).style.display="none";
   });
+
+  ["frontOk","backOk"].forEach(i=>$(i).style.display="none");
+
+  $("frontInput").value="";
+  $("backInput").value="";
+  $("ocrText").textContent="";
+  $("bar").style.width="0";
+  updatePhotoStatus();
+};
+
+$("csvBtn").onclick=()=>{
+  const a=all();
+  if(!a.length)return;
+  const q=v=>`"${String(v||"").replace(/"/g,'""')}"`;
+  const csv="\uFEFF"+ids.join(";")+"\n"+a.map(w=>ids.map(i=>q(w[i])).join(";")).join("\n");
+  const u=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
+  const l=document.createElement("a");
+  l.href=u;
+  l.download="weinkeller-v5-3.csv";
+  l.click();
+  setTimeout(()=>URL.revokeObjectURL(u),1000);
+};
+
+// Alte Service Worker und alte Cache-Versionen entfernen.
+// V5.3 registriert bewusst KEINEN neuen Service Worker.
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.getRegistrations()
+    .then(rs=>Promise.all(rs.map(r=>r.unregister())))
+    .then(()=>debug("Alte Service Worker entfernt."));
+}
+if("caches" in window){
+  caches.keys()
+    .then(keys=>Promise.all(keys.map(k=>caches.delete(k))))
+    .then(()=>debug("Alte App-Caches entfernt."));
 }
 
 render();

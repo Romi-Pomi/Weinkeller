@@ -4,8 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#7b1d2d">
-  <title>Weinkeller Scanner V5.2</title>
-  <link rel="manifest" href="manifest.webmanifest">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Weinkeller Scanner V5.3</title>
+  <link rel="manifest" href="manifest.webmanifest?v=5.3">
   <style>
     *{box-sizing:border-box}
     body{margin:0;background:#f6f1ee;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#251d1d}
@@ -15,17 +18,18 @@
     h2{font-size:28px;margin:0 0 18px}
     .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
     .field{display:grid;gap:7px;min-width:0}
-    .full{grid-column:1/-1}
     label{font-weight:700}
     input,select,textarea{padding:14px;border:2px solid #d9d4d2;border-radius:16px;font-size:18px;width:100%;min-width:0;background:#fff}
     button,.filebtn{display:block;border:0;border-radius:18px;padding:16px;font-size:18px;font-weight:800;text-align:center;margin:10px 0;background:#efe4e4;color:#7b1d2d;cursor:pointer}
     .primary{background:#7b1d2d!important;color:#fff!important}
     .photo-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
     .photo-box{background:#faf7f6;border-radius:18px;padding:12px}
-    .photo-box img{display:none;width:100%;height:260px;object-fit:contain;border-radius:14px;background:#eee}
+    .photo-box img{display:none;width:100%;height:260px;object-fit:contain;border-radius:14px;background:#eee;margin-top:10px}
+    .ok{font-size:13px;font-weight:700;color:#1d6b32;margin-top:6px;display:none}
     .progress{height:10px;background:#eee;border-radius:10px;overflow:hidden;margin-top:12px}
     .bar{height:100%;width:0;background:#7b1d2d}
     #status{padding:12px;background:#e7f5e9;border-radius:12px;margin-top:10px}
+    #debug{white-space:pre-wrap;font-size:12px;background:#f4f4f4;padding:10px;border-radius:10px;margin-top:10px}
     #ocrText{white-space:pre-wrap;font-size:12px;max-height:300px;overflow:auto}
     .archive-item{padding:10px 0;border-top:1px solid #eee}
     .muted{font-size:13px;color:#6f6464}
@@ -39,7 +43,7 @@
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
-<header>🍷 Weinkeller Scanner V5.2</header>
+<header>🍷 Weinkeller Scanner V5.3</header>
 <main>
   <section class="card">
     <h2>1. Etiketten erfassen</h2>
@@ -47,24 +51,30 @@
     <div class="photo-grid">
       <div class="photo-box">
         <strong>Vorderseite</strong>
-        <label class="filebtn primary">📸 Vorderseite fotografieren
-          <input id="frontInput" type="file" accept="image/*" capture="environment" hidden>
-        </label>
+        <label class="filebtn primary" for="frontInput">📸 Vorderseite fotografieren</label>
+        <input id="frontInput" type="file" accept="image/*" capture="environment" style="position:absolute;left:-9999px">
+        <div id="frontOk" class="ok">✅ Foto übernommen</div>
         <img id="frontPreview" alt="Vorderseite">
       </div>
 
       <div class="photo-box">
         <strong>Rückseite</strong>
-        <label class="filebtn">📸 Rückseite fotografieren
-          <input id="backInput" type="file" accept="image/*" capture="environment" hidden>
-        </label>
+        <label class="filebtn" for="backInput">📸 Rückseite fotografieren</label>
+        <input id="backInput" type="file" accept="image/*" capture="environment" style="position:absolute;left:-9999px">
+        <div id="backOk" class="ok">✅ Foto übernommen</div>
         <img id="backPreview" alt="Rückseite">
       </div>
     </div>
 
-    <button id="analyzeBtn" disabled>🧠 Beide Etiketten lokal analysieren</button>
+    <button id="analyzeBtn" disabled>🧠 Etiketten lokal analysieren</button>
     <div class="progress"><div id="bar" class="bar"></div></div>
-    <div id="status">Du kannst nur die Vorderseite oder Vorder- und Rückseite fotografieren.</div>
+    <div id="status">Noch kein Foto übernommen.</div>
+
+    <details>
+      <summary>Technische Diagnose anzeigen</summary>
+      <div id="debug">V5.3 geladen.</div>
+    </details>
+
     <details>
       <summary>Erkannten Rohtext anzeigen</summary>
       <div id="ocrText"></div>
@@ -76,27 +86,18 @@
     <div class="grid">
       <div class="field"><label>EAN / UPC</label><input id="ean"></div>
       <div class="field"><label>Weingut</label><input id="winery"></div>
-
       <div class="field"><label>Jahrgang</label><input id="vintage" inputmode="numeric"></div>
-      <div class="field"><label>Weinart</label>
-        <select id="type"><option></option><option>Weißwein</option><option>Rotwein</option><option>Rosé</option><option>Schaumwein</option></select>
-      </div>
-
+      <div class="field"><label>Weinart</label><select id="type"><option></option><option>Weißwein</option><option>Rotwein</option><option>Rosé</option><option>Schaumwein</option></select></div>
       <div class="field"><label>Rebsorte(n)</label><input id="grapes"></div>
       <div class="field"><label>Land</label><input id="country"></div>
-
       <div class="field"><label>Region</label><input id="region"></div>
       <div class="field"><label>Lage / Appellation</label><input id="appellation"></div>
-
       <div class="field"><label>Prädikat</label><input id="predicate"></div>
       <div class="field"><label>Alkohol %</label><input id="alcohol" inputmode="decimal"></div>
-
       <div class="field"><label>Flaschengröße (l)</label><input id="size" value="0,75"></div>
       <div class="field"><label>Menge</label><input id="qty" value="1"></div>
-
       <div class="field"><label>Kaufpreis / Fl. (€)</label><input id="price"></div>
       <div class="field"><label>Regal</label><input id="shelf"></div>
-
       <div class="field"><label>Fach</label><input id="slot"></div>
       <div class="field"><label>Notiz kurz</label><input id="notes"></div>
     </div>
@@ -110,6 +111,7 @@
     <div id="archive"></div>
   </section>
 </main>
-<script src="app.js?v=5.2"></script>
+
+<script src="app.js?v=5.3"></script>
 </body>
 </html>
